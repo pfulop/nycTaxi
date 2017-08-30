@@ -5,19 +5,22 @@ from datetime import datetime
 import tensorflow as tf
 import numpy as np
 
+predict = pd.read_csv('./inputs/train.csv');
+
 train = pd.read_csv('./inputs/train.csv').sample(n=1000)
+
+
 # train = pd.read_csv('./inputs/train.csv')
 
-def strip_time():
-    t = train['pickup_datetime'].apply(
+def strip_time(data):
+    t = data['pickup_datetime'].apply(
         lambda d: pd.Series([datetime.strptime(d, "%Y-%m-%d %H:%M:%S").strftime("%H"),
-                   datetime.strptime(d, "%Y-%m-%d %H:%M:%S").strftime("%d%m")],index=['hour','date']))
-    return pd.concat([train,t], axis=1)
+                             datetime.strptime(d, "%Y-%m-%d %H:%M:%S").strftime("%d%m")], index=['hour', 'date']))
+    return pd.concat([data, t], axis=1)
 
 
-train = strip_time()
-
-
+train = strip_time(train)
+predict = strip_time(predict)
 
 
 def get_time_period(i):
@@ -54,36 +57,28 @@ def animate_in_time():
         return markers_doff, markers_pup,
 
     animation.FuncAnimation(fig, animate, init_func=init,
-                                   frames=24, interval=40, blit=True)
+                            frames=24, interval=40, blit=True)
     plt.show()
+
 
 def show_hour_mean():
     train.groupby(['hour'])['trip_duration'].mean().plot(kind="bar")
     plt.show()
 
 
-# Parameters
-learning_rate = 0.001
-training_epochs = 15
-batch_size = 100
-display_step = 1
-
 def create_placeholders(n_x, n_y):
     Y = tf.placeholder(tf.float32, shape=(n_y, None), name="Y")
     X = tf.placeholder(tf.float32, shape=(n_x, None), name="X")
-    return X,Y
+    return X, Y
 
 
 def initialize_parameters():
-
-    ### START CODE HERE ### (approx. 6 lines of code)
     W1 = tf.get_variable("W1", [25, 8], initializer=tf.contrib.layers.xavier_initializer(seed=1))
     b1 = tf.get_variable("b1", [25, 1], initializer=tf.zeros_initializer())
     W2 = tf.get_variable("W2", [12, 25], initializer=tf.contrib.layers.xavier_initializer(seed=1))
     b2 = tf.get_variable("b2", [12, 1], initializer=tf.zeros_initializer())
     W3 = tf.get_variable("W3", [1, 12], initializer=tf.contrib.layers.xavier_initializer(seed=1))
     b3 = tf.get_variable("b3", [1, 1], initializer=tf.zeros_initializer())
-    ### END CODE HERE ###
 
     parameters = {"W1": W1,
                   "b1": b1,
@@ -122,18 +117,17 @@ def compute_cost(Z3, Y):
 
 
 def random_mini_batches(X, Y, size):
-    folds = np.maximum(np.floor(X.shape[1]/size),2).astype(int)
-    X_batches = np.array_split(X,folds, axis=1)
+    folds = np.maximum(np.floor(X.shape[1] / size), 2).astype(int)
+    X_batches = np.array_split(X, folds, axis=1)
     Y_batches = np.array_split(Y, folds, axis=1)
     batches = []
     for idx, x in enumerate(X_batches):
-        batches.append((x,Y_batches[idx]))
+        batches.append((x, Y_batches[idx]))
     return batches
 
 
 def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
-          num_epochs=1500, minibatch_size=32, print_cost=True):
-
+          num_epochs=1500, minibatch_size=32, print_cost=True, predict = []):
     (n_x, m) = X_train.shape
     n_y = Y_train.shape[0]
     costs = []
@@ -164,7 +158,6 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
             minibatches = random_mini_batches(X_train, Y_train, minibatch_size)
 
             for minibatch in minibatches:
-
                 (minibatch_X, minibatch_Y) = minibatch
                 _, minibatch_cost = sess.run([optimizer, cost], feed_dict={X: minibatch_X, Y: minibatch_Y})
 
@@ -192,11 +185,20 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
         print("Train Accuracy:", accuracy.eval({X: X_train, Y: Y_train}))
         print("Test Accuracy:", accuracy.eval({X: X_test, Y: Y_test}))
 
+
+        print(sess.run(Z3, feed_dict={X: predict}))
         return parameters
 
+
 Y = train['trip_duration'].values
-train.drop(['trip_duration','store_and_fwd_flag','pickup_datetime', 'dropoff_datetime', 'id'], axis=1, inplace=True)
+train.drop(['trip_duration', 'store_and_fwd_flag', 'pickup_datetime', 'dropoff_datetime', 'id'], axis=1, inplace=True)
+predict.drop(['trip_duration', 'store_and_fwd_flag', 'pickup_datetime', 'dropoff_datetime', 'id'], axis=1, inplace=True)
 
-Y = np.reshape(Y,(1,1000))
+msk = np.random.rand(len(train)) < 0.8
+test = train[~msk]
+train = train[msk]
+Y = np.reshape(Y, (1, Y.shape[0]))
+Ytest = Y[:, ~msk]
+Y = Y[:, msk]
 
-model(train.values.T,Y,[],[])
+model(train.values.T, Y, test.values.T, Ytest, predict=predict.values.T)
