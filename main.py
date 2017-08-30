@@ -6,7 +6,6 @@ import tensorflow as tf
 import numpy as np
 
 predict = pd.read_csv('./inputs/train.csv');
-
 train = pd.read_csv('./inputs/train.csv').sample(n=1000)
 
 
@@ -73,11 +72,11 @@ def create_placeholders(n_x, n_y):
 
 
 def initialize_parameters():
-    W1 = tf.get_variable("W1", [25, 8], initializer=tf.contrib.layers.xavier_initializer(seed=1))
+    W1 = tf.get_variable("W1", [25, 8], initializer=tf.contrib.layers.xavier_initializer())
     b1 = tf.get_variable("b1", [25, 1], initializer=tf.zeros_initializer())
-    W2 = tf.get_variable("W2", [12, 25], initializer=tf.contrib.layers.xavier_initializer(seed=1))
+    W2 = tf.get_variable("W2", [12, 25], initializer=tf.contrib.layers.xavier_initializer())
     b2 = tf.get_variable("b2", [12, 1], initializer=tf.zeros_initializer())
-    W3 = tf.get_variable("W3", [1, 12], initializer=tf.contrib.layers.xavier_initializer(seed=1))
+    W3 = tf.get_variable("W3", [1, 12], initializer=tf.contrib.layers.xavier_initializer())
     b3 = tf.get_variable("b3", [1, 1], initializer=tf.zeros_initializer())
 
     parameters = {"W1": W1,
@@ -108,10 +107,8 @@ def forward_propagation(X, parameters):
 
 
 def compute_cost(Z3, Y):
-    logits = tf.transpose(Z3)
-    labels = tf.transpose(Y)
 
-    cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels))
+    cost = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(tf.log(Z3+1), tf.log(Y+1)))))
 
     return cost
 
@@ -201,4 +198,4 @@ Y = np.reshape(Y, (1, Y.shape[0]))
 Ytest = Y[:, ~msk]
 Y = Y[:, msk]
 
-model(train.values.T, Y, test.values.T, Ytest, predict=predict.values.T)
+model(train.values.T, Y, test.values.T, Ytest)
