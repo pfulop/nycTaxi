@@ -5,7 +5,7 @@ from datetime import datetime
 import tensorflow as tf
 import numpy as np
 
-predict = pd.read_csv('./inputs/train.csv')
+predict = pd.read_csv('./inputs/test.csv')
 train = pd.read_csv('./inputs/train.csv').sample(n=1000)
 
 
@@ -201,7 +201,7 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
 
 Y = train['trip_duration'].values
 train.drop(['trip_duration', 'store_and_fwd_flag', 'pickup_datetime', 'dropoff_datetime', 'id'], axis=1, inplace=True)
-predict.drop(['trip_duration', 'store_and_fwd_flag', 'pickup_datetime', 'dropoff_datetime', 'id'], axis=1, inplace=True)
+predict.drop(['store_and_fwd_flag', 'pickup_datetime' , 'id'], axis=1, inplace=True)
 
 msk = np.random.rand(len(train)) < 0.8
 test = train[~msk]
@@ -209,7 +209,6 @@ train = train[msk]
 Y = np.reshape(Y, (1, Y.shape[0]))
 Ytest = Y[:, ~msk]
 Y = Y[:, msk]
-
 tf.reset_default_graph()
 model(train.values.T, Y, test.values.T, Ytest, predict=predict.values.T)
 
