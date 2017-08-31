@@ -5,7 +5,7 @@ from datetime import datetime
 import tensorflow as tf
 import numpy as np
 
-predict = pd.read_csv('./inputs/train.csv');
+predict = pd.read_csv('./inputs/train.csv')
 train = pd.read_csv('./inputs/train.csv').sample(n=1000)
 
 
@@ -86,6 +86,8 @@ def initialize_parameters():
                   "W3": W3,
                   "b3": b3}
 
+    print(parameters)
+
     return parameters
 
 
@@ -102,14 +104,13 @@ def forward_propagation(X, parameters):
     Z2 = tf.add(tf.matmul(W2, A1), b2)
     A2 = tf.nn.relu(Z2)
     Z3 = tf.add(tf.matmul(W3, A2), b3)
+    A3 = tf.nn.relu(Z3)
+    return A3
 
-    return Z3
 
+def compute_cost(A3, Y):
 
-def compute_cost(Z3, Y):
-
-    cost = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(tf.log(Z3+1), tf.log(Y+1)))))
-
+    cost = tf.sqrt(tf.reduce_mean(tf.square(tf.subtract(tf.log1p(A3), tf.log1p(Y)))))
     return cost
 
 
@@ -124,7 +125,7 @@ def random_mini_batches(X, Y, size):
 
 
 def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
-          num_epochs=1500, minibatch_size=32, print_cost=True, predict = []):
+          num_epochs=1500, minibatch_size=128, print_cost=True, predict = []):
     (n_x, m) = X_train.shape
     n_y = Y_train.shape[0]
     costs = []
@@ -133,16 +134,17 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
 
     parameters = initialize_parameters()
 
-    Z3 = forward_propagation(X, parameters)
+    A3 = forward_propagation(X, parameters)
 
-    cost = compute_cost(Z3, Y)
+    cost = compute_cost(A3, Y)
 
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
-
     init = tf.global_variables_initializer()
 
     mbatch = 0
 
+    tf.summary.FileWriter('./logs', graph=tf.get_default_graph())
+    saver = tf.train.Saver()
     with tf.Session() as sess:
 
         sess.run(init)
@@ -170,12 +172,12 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
         plt.ylabel('cost')
         plt.xlabel('iterations (per tens)')
         plt.title("Learning rate =" + str(learning_rate))
-        plt.show()
+        # plt.show()
 
         parameters = sess.run(parameters)
         print("Parameters have been trained!")
 
-        correct_prediction = tf.equal(tf.argmax(Z3), tf.argmax(Y))
+        correct_prediction = tf.equal(tf.argmax(A3), tf.argmax(Y))
 
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
@@ -183,7 +185,17 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
         print("Test Accuracy:", accuracy.eval({X: X_test, Y: Y_test}))
 
 
-        print(sess.run(Z3, feed_dict={X: predict}))
+        pred = sess.run(A3, feed_dict={X: predict})
+        saver.save(sess, './logs/nyc-model')
+        t = pd.read_csv('./inputs/test.csv')
+        output = pd.DataFrame()
+        output['id'] = t['id']
+        print(pred[0])
+        print(pred.shape)
+        print(t['id'].values.shape)
+        output['trip_duration'] = pred[0]
+        output[['id','trip_duration']].to_csv('./submit.csv', index = False)
+        sess.close()
         return parameters
 
 
@@ -198,4 +210,6 @@ Y = np.reshape(Y, (1, Y.shape[0]))
 Ytest = Y[:, ~msk]
 Y = Y[:, msk]
 
-model(train.values.T, Y, test.values.T, Ytest)
+tf.reset_default_graph()
+model(train.values.T, Y, test.values.T, Ytest, predict=predict.values.T)
+
